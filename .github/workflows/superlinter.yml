@@ -1,0 +1,27 @@
+name: Super Linter
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      # ✅ 浅いクローンだと失敗するので、完全履歴でチェックアウト
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ✅ まとめLint（失敗で止めない＝まずは警告表示にする）
+      - name: Super-Linter
+        uses: super-linter/super-linter/slim@v6
+        env:
+          VALIDATE_ALL_CODEBASE: false
+          DEFAULT_BRANCH: main
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISABLE_ERRORS: true
