@@ -1,0 +1,34 @@
+name: CI
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # package.json がある時だけ Node セットアップ＆npm系を実行
+      - name: Setup Node
+        if: hashFiles('**/package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install deps
+        if: hashFiles('**/package.json') != ''
+        run: npm ci
+
+      - name: Lint
+        if: hashFiles('**/package.json') != ''
+        run: npm run lint --if-present
+
+      - name: Test
+        if: hashFiles('**/package.json') != ''
+        run: npm test --if-present
+
+      # どのプロジェクトでも最低限通る“おまじない”
+      - name: Sanity
+        run: echo "CI OK"
