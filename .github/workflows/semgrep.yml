@@ -7,7 +7,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: returntocorp/semgrep-action@v1
         with:
           config: "p/ci"   # 誤検知少なめの安全プリセット
