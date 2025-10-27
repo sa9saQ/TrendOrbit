@@ -1,5 +1,42 @@
 version: 2
 updates:
-  - package-ecosystem: "npm"
+  # npm 依存（毎週日曜 09:00 JST）
+  - package-ecosystem: npm
     directory: "/"
-    schedule: { interval: "weekly" }
+    target-branch: "main"
+    schedule:
+      interval: weekly
+      day: sunday
+      time: "09:00"
+      timezone: Asia/Tokyo
+    open-pull-requests-limit: 5
+    labels:
+      - "deps"
+      - "npm"
+    groups:
+      npm-minor-patch:
+        update-types:
+          - minor
+          - patch
+      npm-major:
+        update-types:
+          - major
+
+  # GitHub Actions（週次のみ：曜日/時間は指定不可）
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: "main"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - "deps"
+      - "gha"
+    groups:
+      gha-minor-patch:
+        update-types:
+          - minor
+          - patch
+      gha-major:
+        update-types:
+          - major
