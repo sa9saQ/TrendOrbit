@@ -1,17 +1,30 @@
 name: CodeQL
+
 on:
+  push:
+    branches: [ "main" ]          # ← mainへのpushでも実行
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main" ]          # ← PRでも実行
+  schedule:
+    - cron: "0 3 * * 1"           # ← 週1回（月曜 03:00 UTC）定期スキャン
+
 permissions:
   contents: read
   security-events: write
+
 jobs:
   analyze:
+    name: Analyze JS/TS
     runs-on: ubuntu-latest
     strategy:
-      matrix: { language: [ 'javascript-typescript' ] }
+      fail-fast: false
+      matrix:
+        language: [ javascript-typescript ]
     steps:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v3
-        with: { languages: ${{ matrix.language }} }
+        with:
+          languages: ${{ matrix.language }}
       - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
