@@ -9,7 +9,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # package.json がある時だけ Node セットアップ＆npm系を実行
+      # Nodeプロジェクトの場合だけ実行
       - name: Setup Node
         if: hashFiles('**/package.json') != ''
         uses: actions/setup-node@v4
@@ -29,6 +29,5 @@ jobs:
         if: hashFiles('**/package.json') != ''
         run: npm test --if-present
 
-      # どのプロジェクトでも最低限通る“おまじない”
       - name: Sanity
         run: echo "CI OK"
