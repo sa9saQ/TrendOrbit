@@ -1,23 +1,51 @@
-name: Auto trigger CodeRabbit on bot PRs
-
+name: Auto trigger CodeRabbit on risky bot PRs
 on:
   pull_request_target:
     types: [opened, reopened, synchronize]
 
 permissions:
+  issues: write
   pull-requests: write
 
 jobs:
-  trigger:
-    # Dependabot / Renovate など Bot のPRだけに限定
-    if: |
-      github.actor == 'dependabot[bot]' ||
-      github.actor == 'renovate[bot]'
+  detect:
     runs-on: ubuntu-latest
     steps:
-      - name: Comment to trigger CodeRabbit
+      # 変更ファイルの種類で判定（src配下に影響があれば risky 扱い）
+      - uses: dorny/paths-filter@v3
+        id: cf
+        with:
+          filters: |
+            app:
+              - 'src/**'
+              - 'apps/**'
+              - 'packages/**'
+              - '!**/package*.json'
+              - '!**/pnpm-lock.yaml'
+              - '!**/yarn.lock'
+      - name: Set flags
+        id: flags
+        run: |
+          # PRのラベルから “セキュリティ／メジャー” を検出
+          labels='${{ toJson(github.event.pull_request.labels.*.name) }}'
+          title='${{ github.event.pull_request.title }}'
+          risky=0
+          echo "$labels" | grep -qi 'security' && risky=1
+          echo "$labels" | grep -qi 'semver-major' && risky=1     # Dependabot の一般的ラベル
+          echo "$title"  | grep -qi 'chore(deps)!' && risky=1     # Renovate のメジャー記法例
+          [ "${{ steps.cf.outputs.app }}" = "true" ] && risky=1
+          echo "risky=$risky" >> "$GITHUB_OUTPUT"
+
+  trigger:
+    needs: detect
+    runs-on: ubuntu-latest
+    if: |
+      contains(fromJson('["dependabot[bot]","renovate[bot]"]'), github.event.pull_request.user.login)
+      && needs.detect.outputs.risky == '1'
+    steps:
+      - name: Request CodeRabbit review
         uses: peter-evans/create-or-update-comment@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
-          body: '@coderabbitai review'
+          body: "@coderabbitai review"
