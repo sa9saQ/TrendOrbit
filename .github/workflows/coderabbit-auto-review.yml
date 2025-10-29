@@ -1,23 +1,58 @@
-name: Auto trigger CodeRabbit on bot PRs
+name: Auto trigger CodeRabbit only for high-risk bot PRs
 
 on:
   pull_request_target:
-    types: [opened, reopened, synchronize]
+    types: [opened, reopened, synchronize, ready_for_review]
 
 permissions:
+  issues: write
   pull-requests: write
 
 jobs:
-  trigger:
-    # Dependabot / Renovate など Bot のPRだけに限定
-    if: |
-      github.actor == 'dependabot[bot]' ||
-      github.actor == 'renovate[bot]'
+  maybe-trigger:
     runs-on: ubuntu-latest
+
+    # Bot作成PR（dependabot / renovate）のみ対象
+    if: contains(fromJson('["dependabot[bot]", "renovate[bot]"]'), github.event.pull_request.user.login)
+
+    outputs:
+      high_risk: ${{ steps.assess.outputs.high }}
+
     steps:
-      - name: Comment to trigger CodeRabbit
+      - name: Assess risk (security or semver major)
+        id: assess
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const title = pr.title || "";
+            const labels = (pr.labels || []).map(l => (l.name || "").toLowerCase());
+
+            // 1) ラベルでセキュリティ判定（Dependabotのsecurityラベル等）
+            let high = labels.includes('security');
+
+            // 2) タイトルから「from X to Y」のメジャー昇格を判定（npm/Actionsなど想定）
+            //    例: "Bump foo from 1.2.3 to 2.0.0" / "Bump actions/checkout from v4 to v5"
+            const m = title.match(/from\s+v?(\d+)(?:\.\d+[^ ]*)?\s+to\s+v?(\d+)(?:\.\d+[^ ]*)?/i);
+            if (m) {
+              const fromMaj = parseInt(m[1], 10);
+              const toMaj   = parseInt(m[2], 10);
+              if (!Number.isNaN(fromMaj) && !Number.isNaN(toMaj) && toMaj > fromMaj) {
+                high = true;
+              }
+            }
+
+            // 3) Renovateがよく付けるmajor系ラベル（存在すれば）
+            const majorish = ['major', 'type: major', 'semver:major', 'semver-major'];
+            if (!high && labels.some(l => majorish.includes(l))) high = true;
+
+            core.setOutput('high', String(high));
+            core.info(`High risk? ${high} (title="${title}", labels=${JSON.stringify(labels)})`);
+
+      - name: Trigger CodeRabbit review
+        if: steps.assess.outputs.high == 'true'
         uses: peter-evans/create-or-update-comment@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
-          body: '@coderabbitai review'
+          body: "@coderabbitai review"
